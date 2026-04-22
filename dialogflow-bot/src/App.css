@@ -68,6 +68,12 @@
   line-height: 0.95;
 }
 
+.subcopy {
+  max-width: 720px;
+  margin: 14px 0 0;
+  color: var(--color-muted);
+}
+
 .topbar-status {
   display: flex;
   align-items: center;
@@ -80,7 +86,6 @@
 .ghost-button,
 .quick-action,
 .chat-badges span,
-.chips button,
 .composer-options button {
   border: 1px solid var(--color-border);
   background: rgba(255, 255, 255, 0.72);
@@ -95,19 +100,33 @@
   padding: 12px 16px;
   font-size: 0.92rem;
   color: var(--color-ink);
+  max-width: 420px;
 }
 
 .status-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+.status-dot.connected {
   background: #1bb980;
   box-shadow: 0 0 0 6px rgba(27, 185, 128, 0.18);
 }
 
+.status-dot.connecting,
+.status-dot.booting {
+  background: #f0a04f;
+  box-shadow: 0 0 0 6px rgba(240, 160, 79, 0.18);
+}
+
+.status-dot.disconnected {
+  background: #d45f5f;
+  box-shadow: 0 0 0 6px rgba(212, 95, 95, 0.18);
+}
+
 .ghost-button,
 .quick-action,
-.chips button,
 .composer-options button,
 .primary-button {
   cursor: pointer;
@@ -123,12 +142,21 @@
 
 .ghost-button:hover,
 .quick-action:hover,
-.chips button:hover,
 .composer-options button:hover,
 .primary-button:hover {
   transform: translateY(-1px);
   border-color: rgba(18, 122, 110, 0.32);
   box-shadow: 0 14px 28px rgba(17, 38, 56, 0.08);
+}
+
+.ghost-button:disabled,
+.quick-action:disabled,
+.composer-options button:disabled,
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
 }
 
 .ghost-button {
@@ -193,11 +221,12 @@
   padding: 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.12);
+  overflow-wrap: anywhere;
 }
 
 .hero-metrics strong {
   display: block;
-  font-size: 1.7rem;
+  font-size: 1.2rem;
 }
 
 .hero-metrics span {
@@ -232,8 +261,7 @@
 
 .activity-card,
 .knowledge-card,
-.transcript-card,
-.mini-chart {
+.transcript-card {
   padding: 16px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.72);
@@ -241,7 +269,8 @@
 }
 
 .activity-card p,
-.knowledge-card p {
+.knowledge-card p,
+.knowledge-card h4 {
   margin: 0;
 }
 
@@ -250,6 +279,7 @@
   margin: 8px 0 6px;
   font-size: 1.1rem;
   color: var(--color-ink);
+  overflow-wrap: anywhere;
 }
 
 .activity-card span,
@@ -298,6 +328,8 @@
   padding: 10px 14px;
   font-size: 0.82rem;
   color: var(--color-ink);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .message-stream {
@@ -322,9 +354,8 @@
 
 .message.system {
   max-width: 100%;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
+  background: rgba(22, 48, 66, 0.06);
+  border: 1px dashed rgba(22, 48, 66, 0.16);
   color: var(--color-muted);
 }
 
@@ -344,6 +375,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
   font-size: 0.82rem;
   color: var(--color-muted);
@@ -354,17 +386,20 @@
   color: var(--color-ink);
 }
 
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 14px;
+.source-badge,
+.intent-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(17, 38, 56, 0.08);
+  color: var(--color-ink);
 }
 
-.chips button {
-  border-radius: 999px;
-  padding: 10px 14px;
-  color: var(--color-ink);
+.intent-chip {
+  margin-top: 12px;
+  font-size: 0.82rem;
 }
 
 .composer {
@@ -428,28 +463,6 @@
 .transcript-card ul {
   margin: 0;
   padding-left: 18px;
-}
-
-.bars {
-  display: grid;
-  gap: 12px;
-}
-
-.bars div {
-  display: grid;
-  gap: 6px;
-}
-
-.bars label {
-  font-size: 0.9rem;
-  color: var(--color-ink);
-}
-
-.bars span {
-  display: block;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #114b5f, #1a936f, #f0a04f);
 }
 
 @keyframes rise {
