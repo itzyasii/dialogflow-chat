@@ -22,12 +22,6 @@ type SessionState = {
 
 type SocketStatus = "booting" | "connecting" | "connected" | "disconnected";
 
-type ActivityCard = {
-  label: string;
-  value: string;
-  detail: string;
-};
-
 type QuickAction = {
   label: string;
   prompt: string;
@@ -38,22 +32,26 @@ const quickActions: QuickAction[] = [
   {
     label: "Track order",
     prompt: "I want to track my order status.",
-    simulatedReply: "I can help with that. Please share your order number so I can look it up.",
+    simulatedReply:
+      "I can help with that. Please share your order number so I can look it up.",
   },
   {
     label: "Refund policy",
     prompt: "Explain the refund policy for late deliveries.",
-    simulatedReply: "Refunds are available for eligible delayed deliveries. I can walk you through the policy or start a request.",
+    simulatedReply:
+      "Refunds are available for eligible delayed deliveries. I can walk you through the policy or start a request.",
   },
   {
     label: "Store hours",
     prompt: "What are your support hours today?",
-    simulatedReply: "Support is available from 9:00 AM to 9:00 PM local time today.",
+    simulatedReply:
+      "Support is available from 9:00 AM to 9:00 PM local time today.",
   },
   {
-    label: "Talk to support",
+    label: "Escalate",
     prompt: "Please connect me with a human support agent.",
-    simulatedReply: "I can escalate this to a support specialist. Please hold while I capture a brief summary.",
+    simulatedReply:
+      "I can escalate this to a support specialist. Please hold while I capture a brief summary.",
   },
 ];
 
@@ -61,6 +59,13 @@ function formatTime(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
   }).format(new Date(value));
 }
 
@@ -76,6 +81,13 @@ function dedupeMessages(messages: ChatMessage[]) {
   );
 }
 
+function statusLabel(status: SocketStatus, bootMessage: string) {
+  if (status === "connected") return "Connected";
+  if (status === "connecting") return "Connecting";
+  if (status === "disconnected") return "Disconnected";
+  return bootMessage;
+}
+
 function App() {
   const socketRef = useRef<Socket | null>(null);
   const streamRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +96,7 @@ function App() {
   const [chat, setChat] = useState<ChatState | null>(null);
   const [composerValue, setComposerValue] = useState("");
   const [socketStatus, setSocketStatus] = useState<SocketStatus>("booting");
-  const [bootMessage, setBootMessage] = useState("Preparing your chat workspace...");
+  const [bootMessage, setBootMessage] = useState("Preparing your workspace...");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -107,7 +119,7 @@ function App() {
   useEffect(() => {
     const boot = async () => {
       try {
-        setBootMessage("Starting a client session with the backend...");
+        setBootMessage("Starting a secure client session...");
 
         const storedSession = window.localStorage.getItem(STORAGE_KEY);
         const parsedSession = storedSession
@@ -128,10 +140,12 @@ function App() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
         setSession(nextSession);
         setChat(bootstrap.chat);
-        setBootMessage("Session ready. Connecting live updates...");
+        setBootMessage("Session ready");
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Unable to bootstrap session",
+          error instanceof Error
+            ? error.message
+            : "Unable to bootstrap session",
         );
         setSocketStatus("disconnected");
       }
@@ -171,7 +185,9 @@ function App() {
         setChat(history);
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Unable to refresh chat history",
+          error instanceof Error
+            ? error.message
+            : "Unable to refresh chat history",
         );
       }
     });
@@ -293,7 +309,9 @@ function App() {
       await simulateWebhookReply({
         userId: session.userId,
         text: fallbackReply,
-        intent: latestUserMessage ? "Frontend Simulation Follow-up" : "Initial Simulation",
+        intent: latestUserMessage
+          ? "Frontend Simulation Follow-up"
+          : "Initial Simulation",
       });
     } catch (error) {
       setErrorMessage(
@@ -304,110 +322,66 @@ function App() {
     }
   };
 
-  const activityCards: ActivityCard[] = [
-    {
-      label: "Socket status",
-      value:
-        socketStatus === "connected"
-          ? "Connected"
-          : socketStatus === "connecting"
-            ? "Connecting"
-            : socketStatus === "booting"
-              ? "Booting"
-              : "Disconnected",
-      detail:
-        socketStatus === "connected"
-          ? "Real-time chat events are flowing through Socket.IO."
-          : "Live updates will resume automatically when the socket reconnects.",
-    },
-    {
-      label: "Messages stored",
-      value: String(chat?.messages.length || 0),
-      detail: "These messages come from MongoDB-backed chat history.",
-    },
-    {
-      label: "Webhook endpoint",
-      value: "/api/v1/dialogflow/webhook",
-      detail: "Trigger Dialogflow fulfillment and replies will appear in this stream.",
-    },
-  ];
+  const totalMessages = chat?.messages.length || 0;
+  const latestMessageAt = chat?.lastMessageAt
+    ? `${formatDate(chat.lastMessageAt)} at ${formatTime(chat.lastMessageAt)}`
+    : "No messages yet";
 
   return (
     <div className="app-shell">
-      <div className="ambient ambient-left" />
-      <div className="ambient ambient-right" />
-
       <header className="topbar">
         <div>
-          <p className="eyebrow">Dialogflow ES Workspace</p>
-          <h1>Conversational Console</h1>
+          <p className="eyebrow">Customer Support Chatbot</p>
+          <h1>CSR Assistant Console</h1>
           <p className="subcopy">
-            Frontend and backend are now wired together through REST bootstrap,
-            Mongo-backed chat history, and a live Socket.IO message stream.
+            A production-style support workspace powered by session bootstrap,
+            persistent chat history, real-time messaging, and Dialogflow webhook
+            responses.
           </p>
         </div>
 
-        <div className="topbar-status">
-          <div className="status-pill">
-            <span className={`status-dot ${socketStatus}`} />
-            {socketStatus === "connected" ? "Realtime connected" : bootMessage}
+        <div className="topbar-actions">
+          <div className={`status-pill ${socketStatus}`}>
+            <span className="status-dot" />
+            <span>{statusLabel(socketStatus, bootMessage)}</span>
           </div>
           <button
-            className="ghost-button"
+            className="secondary-button"
             type="button"
             onClick={handleSimulateWebhook}
             disabled={!session || isSimulating}
           >
-            {isSimulating ? "Simulating..." : "Simulate webhook reply"}
+            {isSimulating ? "Sending..." : "Trigger webhook"}
           </button>
         </div>
       </header>
 
-      <main className="layout">
-        <aside className="panel overview-panel">
-          <section className="hero-card">
-            <p className="section-label">Live integration</p>
-            <h2>Client chat, backend persistence, and webhook replies now share one flow.</h2>
-            <p>
-              The frontend bootstraps a session from the server, joins a private
-              socket room, and listens for Dialogflow fulfillment responses in real time.
-            </p>
-
-            <div className="hero-metrics">
+      <main className="workspace">
+        <aside className="sidebar">
+          <section className="surface primary-summary">
+            <p className="section-label">Session Overview</p>
+            <h2>{chat?.clientUser.displayName || DISPLAY_NAME}</h2>
+            <div className="summary-list">
               <div>
-                <strong>{chat?.messages.length || 0}</strong>
-                <span>Total messages</span>
+                <span>Status</span>
+                <strong>{chat?.status || "open"}</strong>
               </div>
               <div>
-                <strong>{chat?.sessionId || "Pending"}</strong>
-                <span>Session key</span>
+                <span>Messages</span>
+                <strong>{totalMessages}</strong>
+              </div>
+              <div>
+                <span>Last activity</span>
+                <strong>{latestMessageAt}</strong>
               </div>
             </div>
           </section>
 
-          <section className="stack">
-            <div className="section-header">
-              <h3>Runtime diagnostics</h3>
-              <span>Live</span>
+          <section className="surface">
+            <div className="surface-header">
+              <h3>Quick actions</h3>
+              <span>Send instantly</span>
             </div>
-
-            <div className="activity-list">
-              {activityCards.map((item) => (
-                <article className="activity-card" key={item.label}>
-                  <p>{item.label}</p>
-                  <strong>{item.value}</strong>
-                  <span>{item.detail}</span>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="stack">
-            <div className="section-header">
-              <h3>Quick prompts</h3>
-              <span>Send through socket</span>
-            </div>
-
             <div className="quick-actions">
               {quickActions.map((action) => (
                 <button
@@ -417,24 +391,44 @@ function App() {
                   onClick={() => void handleQuickAction(action)}
                   disabled={isSending || socketStatus !== "connected"}
                 >
-                  {action.label}
+                  <strong>{action.label}</strong>
+                  <span>{action.prompt}</span>
                 </button>
               ))}
             </div>
           </section>
+
+          <section className="surface">
+            <div className="surface-header">
+              <h3>Connection details</h3>
+              <span>Current environment</span>
+            </div>
+            <dl className="detail-list">
+              <div>
+                <dt>Client ID</dt>
+                <dd>{session?.userId || "Pending"}</dd>
+              </div>
+              <div>
+                <dt>API</dt>
+                <dd>{API_BASE_URL}</dd>
+              </div>
+              <div>
+                <dt>Socket</dt>
+                <dd>{SERVER_URL}</dd>
+              </div>
+            </dl>
+          </section>
         </aside>
 
-        <section className="panel chat-panel">
+        <section className="chat-shell surface">
           <div className="chat-header">
             <div>
-              <p className="section-label">Conversation stream</p>
-              <h2>{chat?.clientUser.displayName || DISPLAY_NAME}</h2>
+              <p className="section-label">Live Conversation</p>
+              <h2>Support session</h2>
             </div>
-
-            <div className="chat-badges">
-              <span>{session?.userId || "No user"}</span>
-              <span>{SERVER_URL}</span>
-              <span>{API_BASE_URL}</span>
+            <div className="header-meta">
+              <span className="meta-chip">Webhook ready</span>
+              <span className="meta-chip">Mongo persisted</span>
             </div>
           </div>
 
@@ -454,8 +448,9 @@ function App() {
                   <span className="author">System</span>
                 </div>
                 <p>
-                  Send a message to store it in MongoDB, then use the webhook simulation
-                  button or Dialogflow itself to push a server reply back into this chat.
+                  Start the conversation below. User messages go through the
+                  backend socket, and server replies can arrive through the
+                  Dialogflow webhook flow.
                 </p>
               </article>
             ) : null}
@@ -467,19 +462,17 @@ function App() {
               >
                 <div className="message-meta">
                   <span className="author">
-                    {message.senderRole === "server" ? "Bot" : "Customer"}
+                    {message.senderRole === "server" ? "Assistant" : "Customer"}
                   </span>
                   <span>{formatTime(message.createdAt)}</span>
                   <span className="source-badge">{message.source}</span>
                 </div>
-
                 <p>{message.text}</p>
-
                 {message.senderRole === "server" && message.dialogflow?.intent ? (
                   <div className="intent-chip">
-                    Intent: {message.dialogflow.intent}
+                    {message.dialogflow.intent}
                     {typeof message.dialogflow.confidence === "number"
-                      ? ` (${Math.round(message.dialogflow.confidence * 100)}%)`
+                      ? ` • ${Math.round(message.dialogflow.confidence * 100)}%`
                       : ""}
                   </div>
                 ) : null}
@@ -489,85 +482,28 @@ function App() {
 
           <form className="composer" onSubmit={handleSubmit}>
             <label className="composer-field">
-              <span>Test the bot</span>
+              <span>Message</span>
               <textarea
-                placeholder="Type a customer message and send it through the backend socket..."
+                placeholder="Type a customer message..."
                 rows={3}
                 value={composerValue}
                 onChange={(event) => setComposerValue(event.target.value)}
               />
             </label>
-
             <div className="composer-actions">
-              <div className="composer-options">
-                <button
-                  type="button"
-                  onClick={() => void handleSimulateWebhook()}
-                  disabled={!session || isSimulating}
-                >
-                  {isSimulating ? "Sending webhook..." : "Trigger webhook"}
-                </button>
-              </div>
-
+              <p className="composer-hint">
+                Messages are stored in MongoDB and broadcast through Socket.IO.
+              </p>
               <button
                 className="primary-button"
                 type="submit"
                 disabled={isSending || socketStatus !== "connected"}
               >
-                {isSending ? "Sending..." : "Send test message"}
+                {isSending ? "Sending..." : "Send message"}
               </button>
             </div>
           </form>
         </section>
-
-        <aside className="panel insights-panel">
-          <section className="stack">
-            <div className="section-header">
-              <h3>Integration checklist</h3>
-              <span>Current app flow</span>
-            </div>
-
-            <div className="knowledge-grid">
-              <article className="knowledge-card">
-                <h4>1. Bootstrap</h4>
-                <p>
-                  `POST /api/v1/session/bootstrap` creates a client identity,
-                  returns a JWT, and loads existing chat history.
-                </p>
-              </article>
-
-              <article className="knowledge-card">
-                <h4>2. Realtime chat</h4>
-                <p>
-                  The browser joins its user room and sends messages through
-                  `chat:message:send`, with persistence handled by the backend.
-                </p>
-              </article>
-
-              <article className="knowledge-card">
-                <h4>3. Fulfillment</h4>
-                <p>
-                  Dialogflow webhook replies, or the simulation button, are stored
-                  and emitted back to the same user room.
-                </p>
-              </article>
-            </div>
-          </section>
-
-          <section className="stack transcript-card">
-            <div className="section-header">
-              <h3>Setup reminders</h3>
-              <span>Before demoing</span>
-            </div>
-
-            <ul>
-              <li>Set `VITE_SERVER_URL` if the backend is not running on `http://localhost:5000`.</li>
-              <li>Keep ngrok pointed at the backend and use `/api/v1/dialogflow/webhook` in Dialogflow ES.</li>
-              <li>Include the same client UUID as `originalDetectIntentRequest.payload.userId` for live webhook routing.</li>
-              <li>Make sure MongoDB is running so bootstrap and history retrieval can persist chat data.</li>
-            </ul>
-          </section>
-        </aside>
       </main>
     </div>
   );
