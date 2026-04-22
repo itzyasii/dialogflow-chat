@@ -306,6 +306,49 @@
   line-height: 1.6;
 }
 
+.intake-message {
+  display: grid;
+  gap: 16px;
+}
+
+.intake-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.intake-field {
+  display: grid;
+  gap: 8px;
+}
+
+.intake-field span {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.intake-field input {
+  width: 100%;
+  border: 1px solid #d4deeb;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--color-text);
+  background: #fff;
+  min-height: 0;
+}
+
+.intake-field input:focus {
+  outline: 2px solid rgba(25, 118, 210, 0.16);
+  border-color: rgba(25, 118, 210, 0.38);
+}
+
+.intake-submit {
+  justify-self: start;
+}
+
 .message.system {
   max-width: 100%;
   background: #eef4fb;
@@ -371,7 +414,8 @@
   background: #fdfefe;
 }
 
-.composer textarea:focus {
+.composer textarea:focus,
+.intake-field input:focus {
   outline: 2px solid rgba(25, 118, 210, 0.16);
   border-color: rgba(25, 118, 210, 0.38);
 }

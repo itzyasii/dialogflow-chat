@@ -5,7 +5,6 @@ import "./App.css";
 import {
   API_BASE_URL,
   bootstrapSession,
-  fetchChatHistory,
   SERVER_URL,
   simulateWebhookReply,
 } from "./lib/chatClient";
@@ -18,6 +17,7 @@ type SessionState = {
   token: string;
   userId: string;
   displayName: string;
+  email: string;
 };
 
 type SocketStatus = "booting" | "connecting" | "connected" | "disconnected";
@@ -88,18 +88,27 @@ function statusLabel(status: SocketStatus, bootMessage: string) {
   return bootMessage;
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 function App() {
   const socketRef = useRef<Socket | null>(null);
   const streamRef = useRef<HTMLDivElement | null>(null);
+  const isMountedRef = useRef(false);
+  const isBootingRef = useRef(false);
 
   const [session, setSession] = useState<SessionState | null>(null);
   const [chat, setChat] = useState<ChatState | null>(null);
   const [composerValue, setComposerValue] = useState("");
+  const [nameValue, setNameValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
   const [socketStatus, setSocketStatus] = useState<SocketStatus>("booting");
   const [bootMessage, setBootMessage] = useState("Preparing your workspace...");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   const mergeMessages = useEffectEvent((incoming: ChatMessage[]) => {
     setChat((currentChat) => {
@@ -117,8 +126,15 @@ function App() {
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     const boot = async () => {
+      if (isBootingRef.current) {
+        return;
+      }
+
       try {
+        isBootingRef.current = true;
         setBootMessage("Starting a secure client session...");
 
         const storedSession = window.localStorage.getItem(STORAGE_KEY);
@@ -126,15 +142,27 @@ function App() {
           ? (JSON.parse(storedSession) as SessionState)
           : null;
 
+        if (!parsedSession?.userId) {
+          setBootMessage("Waiting for customer details...");
+          setSocketStatus("disconnected");
+          return;
+        }
+
         const bootstrap = await bootstrapSession({
-          userId: parsedSession?.userId,
-          displayName: parsedSession?.displayName || DISPLAY_NAME,
+          userId: parsedSession.userId,
+          displayName: parsedSession.displayName || DISPLAY_NAME,
+          email: parsedSession.email,
         });
+
+        if (!isMountedRef.current) {
+          return;
+        }
 
         const nextSession = {
           token: bootstrap.token,
           userId: bootstrap.user.externalId,
           displayName: bootstrap.user.displayName || DISPLAY_NAME,
+          email: bootstrap.user.email || parsedSession.email || "",
         };
 
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
@@ -142,16 +170,26 @@ function App() {
         setChat(bootstrap.chat);
         setBootMessage("Session ready");
       } catch (error) {
+        if (!isMountedRef.current) {
+          return;
+        }
+
         setErrorMessage(
           error instanceof Error
             ? error.message
             : "Unable to bootstrap session",
         );
         setSocketStatus("disconnected");
+      } finally {
+        isBootingRef.current = false;
       }
     };
 
     void boot();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -170,7 +208,7 @@ function App() {
 
     socketRef.current = socket;
 
-    socket.on("connect", async () => {
+    socket.on("connect", () => {
       setSocketStatus("connected");
       setErrorMessage("");
       socket.emit("chat:join", {
@@ -179,17 +217,6 @@ function App() {
           displayName: session.displayName,
         },
       });
-
-      try {
-        const history = await fetchChatHistory(session.userId);
-        setChat(history);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to refresh chat history",
-        );
-      }
     });
 
     socket.on("disconnect", () => {
@@ -234,10 +261,11 @@ function App() {
     );
 
     return () => {
+      socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [mergeMessages, session]);
+  }, [session]);
 
   useEffect(() => {
     if (!streamRef.current) {
@@ -249,7 +277,13 @@ function App() {
 
   const handleSend = async (messageText: string) => {
     const trimmedMessage = messageText.trim();
-    if (!trimmedMessage || !session || !socketRef.current) {
+    if (
+      !trimmedMessage ||
+      !session ||
+      !socketRef.current ||
+      isSending ||
+      socketStatus !== "connected"
+    ) {
       return;
     }
 
@@ -283,13 +317,67 @@ function App() {
     await handleSend(composerValue);
   };
 
+  const handleStartSession = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const displayName = nameValue.trim();
+    const email = emailValue.trim().toLowerCase();
+
+    if (!displayName) {
+      setErrorMessage("Please enter your name to start the chat.");
+      return;
+    }
+
+    if (!email || !isValidEmail(email)) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    setIsCreatingSession(true);
+    setErrorMessage("");
+    setSocketStatus("booting");
+    setBootMessage("Creating your support session...");
+
+    try {
+      const bootstrap = await bootstrapSession({
+        displayName,
+        email,
+      });
+
+      const nextSession = {
+        token: bootstrap.token,
+        userId: bootstrap.user.externalId,
+        displayName: bootstrap.user.displayName || displayName,
+        email: bootstrap.user.email || email,
+      };
+
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
+      setSession(nextSession);
+      setChat(bootstrap.chat);
+      setNameValue(nextSession.displayName);
+      setEmailValue(nextSession.email);
+      setBootMessage("Session ready");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to create session",
+      );
+      setSocketStatus("disconnected");
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
+
   const handleQuickAction = async (action: QuickAction) => {
+    if (isSending) {
+      return;
+    }
+
     setComposerValue(action.prompt);
     await handleSend(action.prompt);
   };
 
   const handleSimulateWebhook = async () => {
-    if (!session) {
+    if (!session || isSimulating) {
       return;
     }
 
@@ -326,6 +414,7 @@ function App() {
   const latestMessageAt = chat?.lastMessageAt
     ? `${formatDate(chat.lastMessageAt)} at ${formatTime(chat.lastMessageAt)}`
     : "No messages yet";
+  const sessionReady = Boolean(session);
 
   return (
     <div className="app-shell">
@@ -360,11 +449,11 @@ function App() {
         <aside className="sidebar">
           <section className="surface primary-summary">
             <p className="section-label">Session Overview</p>
-            <h2>{chat?.clientUser.displayName || DISPLAY_NAME}</h2>
+            <h2>{chat?.clientUser.displayName || nameValue || DISPLAY_NAME}</h2>
             <div className="summary-list">
               <div>
                 <span>Status</span>
-                <strong>{chat?.status || "open"}</strong>
+                <strong>{sessionReady ? chat?.status || "open" : "pending"}</strong>
               </div>
               <div>
                 <span>Messages</span>
@@ -409,6 +498,10 @@ function App() {
                 <dd>{session?.userId || "Pending"}</dd>
               </div>
               <div>
+                <dt>Email</dt>
+                <dd>{session?.email || emailValue || "Pending"}</dd>
+              </div>
+              <div>
                 <dt>API</dt>
                 <dd>{API_BASE_URL}</dd>
               </div>
@@ -433,6 +526,44 @@ function App() {
           </div>
 
           <div className="message-stream" ref={streamRef}>
+            {!sessionReady ? (
+              <article className="message system intake-message">
+                <div className="message-meta">
+                  <span className="author">Assistant</span>
+                </div>
+                <p>
+                  Welcome. Before we start, please share your name and email so I can create your support session.
+                </p>
+                <form className="intake-form" onSubmit={handleStartSession}>
+                  <label className="intake-field">
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      placeholder="Your full name"
+                      value={nameValue}
+                      onChange={(event) => setNameValue(event.target.value)}
+                    />
+                  </label>
+                  <label className="intake-field">
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={emailValue}
+                      onChange={(event) => setEmailValue(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="primary-button intake-submit"
+                    type="submit"
+                    disabled={isCreatingSession}
+                  >
+                    {isCreatingSession ? "Creating session..." : "Start chat"}
+                  </button>
+                </form>
+              </article>
+            ) : null}
+
             {errorMessage ? (
               <article className="message system">
                 <div className="message-meta">
@@ -472,7 +603,7 @@ function App() {
                   <div className="intent-chip">
                     {message.dialogflow.intent}
                     {typeof message.dialogflow.confidence === "number"
-                      ? ` • ${Math.round(message.dialogflow.confidence * 100)}%`
+                      ? ` - ${Math.round(message.dialogflow.confidence * 100)}%`
                       : ""}
                   </div>
                 ) : null}
@@ -488,16 +619,19 @@ function App() {
                 rows={3}
                 value={composerValue}
                 onChange={(event) => setComposerValue(event.target.value)}
+                disabled={!sessionReady}
               />
             </label>
             <div className="composer-actions">
               <p className="composer-hint">
-                Messages are stored in MongoDB and broadcast through Socket.IO.
+                {sessionReady
+                  ? "Messages are stored in MongoDB and broadcast through Socket.IO."
+                  : "Create the session first to unlock the chat."}
               </p>
               <button
                 className="primary-button"
                 type="submit"
-                disabled={isSending || socketStatus !== "connected"}
+                disabled={!sessionReady || isSending || socketStatus !== "connected"}
               >
                 {isSending ? "Sending..." : "Send message"}
               </button>

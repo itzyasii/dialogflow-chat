@@ -72,6 +72,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 export async function bootstrapSession(input: {
   userId?: string;
   displayName: string;
+  email?: string;
 }) {
   const response = await fetch(`${API_BASE_URL}/session/bootstrap`, {
     method: "POST",
